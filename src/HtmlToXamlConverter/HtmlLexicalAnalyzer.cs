@@ -13,6 +13,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Collections;
 using System.Text;
+using System.Web;
 
 namespace HTMLConverter
 {
@@ -149,7 +150,12 @@ namespace HTMLConverter
                         }
                         else
                         {
-                            _nextToken.Append(this.NextCharacter);
+                            // If the entityCode is too large to fit into a char, this boolean will be set to true.
+                            // Use the character code instead, and decode it from HTML into regular text.
+                            if (this._nextTokenHasOverflown)
+                                _nextToken.Append(HttpUtility.HtmlDecode(String.Format("&#{0};", this._nextCharacterCode.ToString())));
+                            else
+                                _nextToken.Append(this.NextCharacter);
                             _ignoreNextWhitespace = false;
                         }
                         this.GetNextCharacter();
@@ -371,6 +377,11 @@ namespace HTMLConverter
 
                         // if this is out of range it will set the character to '?'
                         _nextCharacter = (char)_nextCharacterCode;
+
+                        // If the int representation of the character code doesn't match the entityCode, this
+                        // is indicative of a char overflow - we'll want to convert the integer instead to
+                        // avoid supplying a misrepresentation of the entity.
+                        this._nextTokenHasOverflown = _nextCharacterCode != (int)_nextCharacter;
 
                         // as far as we are concerned, this is an entity
                         _isNextCharacterEntity = true;
@@ -809,6 +820,9 @@ namespace HTMLConverter
         // store token and type in local variables before copying them to output parameters
         StringBuilder _nextToken;
         HtmlTokenType _nextTokenType;
+        // Indicates when a token's value exceeds the maximum size of a char. In this case,
+        // we should use the character code (int) instead.
+        private bool _nextTokenHasOverflown;
 
         #endregion Private Fields
     }
